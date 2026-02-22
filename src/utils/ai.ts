@@ -27,20 +27,35 @@ export class AIClient {
 你可以执行以下操作：
 
 1. click - 点击指定位置
-   {"thought": "...", "action": {"action": "click", "x": 500, "y": 300}}
+   {“thought”: “...”, “action”: {“action”: “click”, “x”: 500, “y”: 300}}
 2. double_click - 双击
 3. right_click - 右键点击
 4. long_press - 左键长按（秒）
-   {"thought": "...", "action": {"action": "long_press", "x": 500, "y": 300, "hold_seconds": 1.5}}
+   {“thought”: “...”, “action”: {“action”: “long_press”, “x”: 500, “y”: 300, “hold_seconds”: 1.5}}
 5. type - 输入文本
 6. enter - 按下回车（提交输入）
-   {"thought": "...", "action": {"action": "enter"}}
+   {“thought”: “...”, “action”: {“action”: “enter”}}
 7. press - 按键组合
 8. scroll - 滚动
 9. drag - 拖拽
 10. move - 移动鼠标
 11. wait - 等待
 12. task_complete - 任务完成
+13. shell - 执行命令行命令（新增）
+    {“thought”: “...”, “action”: {“action”: “shell”, “command”: “dir”, “capture_output”: true}}
+
+shell 动作说明：
+- command: 要执行的命令（必填），如 “dir”, “ls -la”, “git status”, “node --version”
+- capture_output: 是否捕获输出，默认 true（可选）
+- timeout: 超时时间（毫秒），默认 30000（可选）
+- work_dir: 工作目录（可选），如 “C:\\project”
+- shell: 指定 shell 类型，如 “powershell”, “cmd”, “bash”（可选）
+- 执行结果会在下一轮迭代中反馈给你
+
+多命令执行方式：
+1. 使用连接符：cd C:\\project && npm install && node app.js
+2. 使用分号：cd C:\\project; npm install; node app.js
+3. 使用 cd 命令会自动跟踪工作目录，后续 shell 命令会在该目录下执行
 
 坐标系说明：
 - 截图坐标系是 1000x1000
@@ -51,9 +66,10 @@ export class AIClient {
 - 只返回 JSON 对象，不要 markdown 代码块，不要额外解释。
 - 需要提交输入框内容时，优先使用 enter 动作，不要等待界面自动提交。
 - 如果任务完成，返回 task_complete。
-- 必须通过“当前截图中的可见证据”确认上一步是否成功，再决定下一步；不能只凭假设继续。
+- 必须通过”当前截图中的可见证据”确认上一步是否成功，再决定下一步；不能只凭假设继续。
 - 如果当前截图与预期不一致（点错、弹错窗口、页面未变化等），不要假装成功；应返回修正动作或 wait。
-- 除非用户任务明确要求“关闭/退出/结束某窗口或程序”，否则禁止执行任何关闭类操作（点击关闭按钮、Alt+F4、关闭终端/控制台等）。`;
+- 除非用户任务明确要求”关闭/退出/结束某窗口或程序”，否则禁止执行任何关闭类操作（点击关闭按钮、Alt+F4、关闭终端/控制台等）。
+- 使用 shell 命令时，请使用安全的命令（如 dir, ls, git, node 等），不要执行危险命令（如 rm -rf, format, deltree 等）。`;
   }
 
   private getClientForEntry(entry: ModelPoolEntry): OpenAI {
@@ -158,8 +174,15 @@ export class AIClient {
           throw new Error('AI 返回空响应');
         }
 
+        // 调试日志：输出 AI 原始返回内容
+        console.log('[AI 原始响应]', content.slice(0, 1000) + (content.length > 1000 ? '...' : ''));
+
         const parsedResponse = this.parseResponseJson(content);
         const fixedAction = this.fixActionFormat(parsedResponse.action);
+
+        // 调试日志：输出解析后的动作
+        console.log('[解析后动作]', JSON.stringify(fixedAction));
+
         this.validateActionOrThrow(fixedAction);
 
         return {
@@ -310,6 +333,13 @@ export class AIClient {
     }
 
     const normalizedAction = this.normalizeActionType(action.action);
+
+    // 特殊处理：如果 action 是 shell 但 command 为空，回退到 wait
+    if (normalizedAction === 'shell' && (!action.command || !String(action.command).trim())) {
+      console.log('shell 动作缺少 command 字段，回退到 wait 动作');
+      return { action: 'wait', duration: 1000 };
+    }
+
     const fixed: Action = {
       action: normalizedAction,
     };
@@ -337,6 +367,13 @@ export class AIClient {
     if (action.hold_seconds !== undefined) fixed.hold_seconds = Number(action.hold_seconds);
     if (action.scroll_amount !== undefined) fixed.scroll_amount = Number(action.scroll_amount);
 
+    // 处理 shell 动作专用字段
+    if (action.command !== undefined) fixed.command = String(action.command);
+    if (action.shell !== undefined) fixed.shell = String(action.shell);
+    if (action.timeout !== undefined) fixed.timeout = Number(action.timeout);
+    if (action.work_dir !== undefined) fixed.work_dir = String(action.work_dir);
+    if (action.capture_output !== undefined) fixed.capture_output = Boolean(action.capture_output);
+
     return fixed;
   }
 
@@ -359,6 +396,11 @@ export class AIClient {
       move: 'move',
       wait: 'wait',
       task_complete: 'task_complete',
+      shell: 'shell',
+      command: 'shell',
+      cmd: 'shell',
+      run: 'shell',
+      execute: 'shell',
       press_enter: 'enter',
       submit: 'enter',
       send: 'enter',
@@ -446,6 +488,11 @@ export class AIClient {
         break;
       case 'enter':
       case 'task_complete':
+        break;
+      case 'shell':
+        if (typeof action.command !== 'string' || !action.command.trim()) {
+          missing('command');
+        }
         break;
       default:
         throw new Error(`ACTION_FORMAT_ERROR: 未知 action ${String((action as Action).action)}`);

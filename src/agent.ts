@@ -9,6 +9,7 @@ import { WindowsController } from './utils/windowsController.js';
 
 interface IController {
   executeAction(action: Action): Promise<void>;
+  getLastShellResultFormatted?(): Promise<string | null>;
 }
 
 export interface AgentRunHooks {
@@ -32,6 +33,8 @@ export class Agent {
   private aiClient: AIClient;
   private controller: IController | null = null;
   private previousActions: Action[] = [];
+  private lastShellResult: string | null = null;
+  private currentWorkDir: string | null = null;  // 会话工作目录
   private isRunning = false;
   private repeatedActionWarning = '';
   private lastActionSignature = '';
@@ -53,6 +56,7 @@ export class Agent {
 
     this.isRunning = true;
     this.previousActions = [];
+    this.lastShellResult = null;
     this.repeatedActionWarning = '';
     this.lastActionSignature = '';
     this.consecutiveSameActionCount = 0;
@@ -89,9 +93,19 @@ export class Agent {
         console.log('正在分析截图...');
         let aiResponse: AIResponse;
         try {
-          const taskForModel = this.repeatedActionWarning
-            ? `${task}\n\n${this.repeatedActionWarning}`
-            : task;
+          // 构建任务提示，包含上一次 shell 执行结果（如果有）
+          let taskForModel = task;
+
+          // 添加 shell 结果反馈
+          if (this.lastShellResult) {
+            taskForModel += `\n\n[上一步执行结果]\n${this.lastShellResult}\n\n请基于上述结果和当前屏幕截图，决定下一步操作。`;
+          }
+
+          // 添加重复动作警告
+          if (this.repeatedActionWarning) {
+            taskForModel += `\n\n${this.repeatedActionWarning}`;
+          }
+
           aiResponse = await this.aiClient.analyzeScreenshot(
             base64Image,
             taskForModel,
@@ -131,8 +145,10 @@ export class Agent {
           return { status: 'stopped', iterations };
         }
 
-        console.log('AI 思考:', aiResponse.thought);
-        console.log('AI 操作:', JSON.stringify(aiResponse.action, null, 2));
+        console.log('\n--- AI 返回内容 ---');
+        console.log('思考:', aiResponse.thought);
+        console.log('原始动作:', JSON.stringify(aiResponse.action, null, 2));
+        console.log('------------------\n');
 
         if (aiResponse.action.action === 'task_complete') {
           console.log('\n' + '='.repeat(50));
@@ -150,8 +166,32 @@ export class Agent {
         }
 
         try {
+          // 为 shell 动作注入当前工作目录
+          if (mappedAction.action === 'shell' && this.currentWorkDir && !mappedAction.work_dir) {
+            mappedAction.work_dir = this.currentWorkDir;
+          }
+
           await this.controller.executeAction(mappedAction);
           this.previousActions.push(aiResponse.action);
+
+          // 如果是 shell 动作，获取执行结果供下次迭代使用
+          if (aiResponse.action.action === 'shell' && this.controller.getLastShellResultFormatted) {
+            this.lastShellResult = await this.controller.getLastShellResultFormatted();
+
+            // 检测是否是 cd 命令，如果是，更新会话工作目录
+            if (aiResponse.action.command) {
+              const cdMatch = aiResponse.action.command.match(/^(?:cd|chdir)\s+([^\s&;|]+)/i);
+              if (cdMatch && cdMatch[1]) {
+                const newDir = cdMatch[1].replace(/['"]/g, '');
+                if (!path.isAbsolute(newDir) && this.currentWorkDir) {
+                  this.currentWorkDir = path.resolve(this.currentWorkDir, newDir);
+                } else if (path.isAbsolute(newDir)) {
+                  this.currentWorkDir = newDir;
+                }
+                console.log(`[shell] 工作目录更新：${this.currentWorkDir}`);
+              }
+            }
+          }
         } catch (error) {
           console.error('执行操作失败:', error);
         }

@@ -1,6 +1,7 @@
 ﻿import { exec } from 'child_process';
 import { promisify } from 'util';
-import { Action, ScreenSize } from '../types/index.js';
+import { Action, ScreenSize, ShellResult } from '../types/index.js';
+import { ShellExecutor } from './shellExecutor.js';
 
 const execAsync = promisify(exec);
 
@@ -9,9 +10,12 @@ const execAsync = promisify(exec);
  */
 export class WindowsController {
   private screenSize: ScreenSize;
+  private shellExecutor: ShellExecutor;
+  private lastShellResult: ShellResult | null = null;
 
   constructor(screenSize: ScreenSize) {
     this.screenSize = screenSize;
+    this.shellExecutor = new ShellExecutor();
   }
 
   async executeAction(action: Action): Promise<void> {
@@ -54,6 +58,9 @@ export class WindowsController {
           break;
         case 'task_complete':
           console.log('Task complete');
+          break;
+        case 'shell':
+          this.lastShellResult = await this.executeShell(action);
           break;
         default:
           console.warn(`Unknown action: ${action.action}`);
@@ -415,5 +422,62 @@ public static class DpiBootstrap {
   private async wait(duration: number): Promise<void> {
     console.log(`Wait ${duration}ms`);
     await this.delay(duration);
+  }
+
+  private async executeShell(action: Action): Promise<ShellResult | null> {
+    if (!action.command) {
+      throw new Error('ACTION_FORMAT_ERROR: shell action requires a command');
+    }
+
+    try {
+      const result = await this.shellExecutor.execute({
+        command: action.command,
+        shell: action.shell || 'powershell.exe',
+        workDir: action.work_dir,
+        timeout: action.timeout,
+        captureOutput: action.capture_output !== false,
+      });
+
+      console.log(`Shell command executed: ${action.command}`);
+      console.log(`Exit code: ${result.exit_code}, Duration: ${result.duration}ms`);
+
+      return result;
+    } catch (error: any) {
+      console.error(`Shell command failed: ${action.command}`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * 获取上一次 shell 执行结果（用于传递给 AI）
+   */
+  getLastShellResult(): ShellResult | null {
+    return this.lastShellResult;
+  }
+
+  /**
+   * 获取格式化后的上一次 shell 执行结果
+   */
+  async getLastShellResultFormatted(): Promise<string | null> {
+    if (!this.lastShellResult) {
+      return null;
+    }
+
+    const result = this.lastShellResult;
+    const parts: string[] = [];
+
+    parts.push(`命令：${result.command}`);
+    parts.push(`退出码：${result.exit_code}`);
+    parts.push(`执行时间：${result.duration}ms`);
+
+    if (result.stdout) {
+      parts.push(`\n标准输出:\n${result.stdout}`);
+    }
+
+    if (result.stderr) {
+      parts.push(`\n标准错误:\n${result.stderr}`);
+    }
+
+    return parts.join('\n');
   }
 }
