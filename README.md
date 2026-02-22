@@ -1,6 +1,6 @@
 # AutoGUI TypeScript
 
-基于视觉的电脑操作 Agent，使用 AI 模型分析屏幕并执行操作。这是 [qwen_autogui](https://github.com/tech-shrimp/qwen_autogui) 的 TypeScript 复刻版本。
+基于视觉的电脑操作 Agent，使用 AI 模型分析屏幕并执行操作。
 
 ## 功能特点
 
@@ -178,17 +178,6 @@ autogui-ts/
 3. **AI 模型**: 需要使用支持视觉的模型
 4. **调试**: 截图会自动保存到 `debug_screenshots/` 目录用于调试
 5. **API Key**: 建议使用多 Key 配置以提高稳定性
-
-## 与 Python 原版的区别
-
-| 特性 | Python 原版 | TypeScript 版本 |
-|------|-------------|-----------------|
-| 语言 | Python | TypeScript/Node.js |
-| 截图 | pyautogui/PIL | screenshot-desktop/sharp |
-| 控制 | pyautogui | @nut-tree-fork/nut-js |
-| AI 客户端 | openai | openai (官方 Node.js SDK) |
-| 多 Key 轮询 | 不支持 | ✅ 支持 |
-| 类型安全 | 无 | 完整类型支持 |
 
 ## License
 
