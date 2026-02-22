@@ -1,0 +1,16 @@
+{
+  "api": {
+    "base_url": "https://api-inference.modelscope.cn/v1",
+    "api_key": [
+      "your-api-key-1-here",
+      "your-api-key-2-here",
+      "your-api-key-3-here"
+    ],
+    "model": "Qwen/Qwen3.5-397B-A17B"
+  },
+  "settings": {
+    "screenshot_interval": 2000,
+    "max_iterations": 50,
+    "coordinate_scale": 1000
+  }
+}

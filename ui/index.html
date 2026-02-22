@@ -1,0 +1,246 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AutoGUI Desktop</title>
+    <style>
+      :root {
+        --bg: #0f172a;
+        --panel: #111827;
+        --text: #e5e7eb;
+        --muted: #9ca3af;
+        --primary: #22c55e;
+        --danger: #ef4444;
+        --border: #334155;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+        color: var(--text);
+        background:
+          radial-gradient(1200px 700px at 10% -10%, #0b3553 0%, rgba(11, 53, 83, 0) 70%),
+          radial-gradient(900px 500px at 100% 0%, #113522 0%, rgba(17, 53, 34, 0) 72%),
+          var(--bg);
+      }
+      .app {
+        display: grid;
+        grid-template-columns: 360px 1fr;
+        gap: 16px;
+        min-height: 100vh;
+        padding: 16px;
+      }
+      .card {
+        background: linear-gradient(180deg, rgba(31, 41, 55, 0.9), rgba(17, 24, 39, 0.95));
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+      }
+      .left { padding: 16px; }
+      h1 { margin: 0; font-size: 20px; }
+      .sub { margin-top: 6px; color: var(--muted); font-size: 13px; }
+      .meta {
+        margin-top: 14px;
+        padding: 12px;
+        border-radius: 10px;
+        border: 1px solid var(--border);
+        background: rgba(17, 24, 39, 0.7);
+        font-size: 13px;
+        line-height: 1.6;
+      }
+      .status {
+        margin-top: 12px;
+        padding: 10px 12px;
+        border-radius: 10px;
+        border: 1px solid var(--border);
+        background: rgba(17, 24, 39, 0.75);
+        font-size: 13px;
+      }
+      .dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 8px;
+      }
+      .idle { background: #64748b; }
+      .running { background: var(--primary); }
+      .error { background: var(--danger); }
+      .field { margin-top: 14px; }
+      label { display: block; margin-bottom: 6px; font-size: 13px; color: var(--muted); }
+      textarea {
+        width: 100%;
+        min-height: 120px;
+        resize: vertical;
+        border-radius: 10px;
+        border: 1px solid var(--border);
+        padding: 10px;
+        color: var(--text);
+        background: #0b1221;
+        font: inherit;
+      }
+      .actions { margin-top: 10px; display: flex; gap: 10px; }
+      button {
+        border: 0;
+        padding: 10px 14px;
+        border-radius: 10px;
+        cursor: pointer;
+        font-weight: 600;
+      }
+      #startBtn { background: var(--primary); color: #052e16; }
+      #stopBtn { background: #334155; color: var(--text); }
+      .right { display: flex; flex-direction: column; }
+      .log-header {
+        padding: 12px 14px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      #clearLog { background: #334155; color: var(--text); padding: 7px 10px; font-size: 12px; }
+      #logs {
+        flex: 1;
+        padding: 12px;
+        margin: 0;
+        overflow: auto;
+        font-family: Consolas, "Courier New", monospace;
+        font-size: 12px;
+        line-height: 1.5;
+        white-space: pre-wrap;
+      }
+      .line-warn { color: #fbbf24; }
+      .line-error { color: #f87171; }
+      @media (max-width: 980px) { .app { grid-template-columns: 1fr; } }
+    </style>
+  </head>
+  <body>
+    <main class="app">
+      <section class="card left">
+        <h1>AutoGUI Desktop</h1>
+        <div class="sub">基于视觉的桌面自动化</div>
+
+        <div id="meta" class="meta">正在加载配置...</div>
+
+        <div id="status" class="status">
+          <span class="dot idle"></span>
+          <span id="statusText">空闲</span>
+        </div>
+
+        <div class="field">
+          <label for="taskInput">任务描述</label>
+          <textarea id="taskInput" placeholder="例如：帮我在浏览器中打开 GitHub 并搜索 qwen_autogui"></textarea>
+        </div>
+
+        <div class="actions">
+          <button id="startBtn">开始任务</button>
+          <button id="stopBtn">停止任务</button>
+        </div>
+      </section>
+
+      <section class="card right">
+        <div class="log-header">
+          <strong>运行日志</strong>
+          <button id="clearLog">清空日志</button>
+        </div>
+        <pre id="logs"></pre>
+      </section>
+    </main>
+
+    <script>
+      const statusText = document.getElementById('statusText');
+      const statusEl = document.getElementById('status');
+      const taskInput = document.getElementById('taskInput');
+      const startBtn = document.getElementById('startBtn');
+      const stopBtn = document.getElementById('stopBtn');
+      const logs = document.getElementById('logs');
+      const clearLog = document.getElementById('clearLog');
+      const meta = document.getElementById('meta');
+      const bridge = window.autogui;
+
+      function appendLog(message, level = 'log') {
+        const line = document.createElement('div');
+        if (level === 'warn') line.className = 'line-warn';
+        if (level === 'error') line.className = 'line-error';
+        line.textContent = message;
+        logs.appendChild(line);
+        logs.scrollTop = logs.scrollHeight;
+      }
+
+      function setStatus(status, detail) {
+        const dot = statusEl.querySelector('.dot');
+        dot.className = `dot ${status}`;
+        statusText.textContent = detail || status;
+        startBtn.disabled = status === 'running';
+      }
+
+      async function loadMeta() {
+        try {
+          const res = await bridge.getConfigMeta();
+          if (!res.ok) {
+            meta.textContent = `配置读取失败: ${res.message || 'unknown error'}`;
+            return;
+          }
+          meta.innerHTML =
+            `API: ${res.config.baseURL}<br>` +
+            `模型: ${res.config.model}<br>` +
+            `API Key 数量: ${res.config.keyCount}`;
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          meta.textContent = `配置读取失败: ${message}`;
+          appendLog(`配置读取异常: ${message}`, 'error');
+        }
+      }
+
+      startBtn.addEventListener('click', async () => {
+        const task = taskInput.value.trim();
+        if (!task) {
+          appendLog('任务不能为空', 'warn');
+          return;
+        }
+        try {
+          const result = await bridge.startTask(task);
+          if (!result.ok) {
+            appendLog(`启动失败: ${result.message || 'unknown error'}`, 'error');
+          }
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          appendLog(`启动异常: ${message}`, 'error');
+        }
+      });
+
+      stopBtn.addEventListener('click', async () => {
+        try {
+          await bridge.stopTask();
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          appendLog(`停止异常: ${message}`, 'error');
+        }
+      });
+
+      clearLog.addEventListener('click', () => {
+        logs.textContent = '';
+      });
+
+      if (!bridge) {
+        meta.textContent = '预加载失败：window.autogui 不可用，请重启应用。';
+        setStatus('error', '桥接异常');
+        startBtn.disabled = true;
+        stopBtn.disabled = true;
+        appendLog('预加载桥接不可用，无法发送任务。', 'error');
+      } else {
+        bridge.onStatus(({ status, detail }) => {
+          setStatus(status, detail);
+        });
+
+        bridge.onLog(({ level, message, timestamp }) => {
+          const time = new Date(timestamp).toLocaleTimeString();
+          appendLog(`[${time}] ${message}`, level);
+        });
+
+        loadMeta();
+        setStatus('idle', '空闲');
+      }
+    </script>
+  </body>
+</html>

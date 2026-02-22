@@ -1,0 +1,44 @@
+{
+  "name": "autogui-ts",
+  "version": "1.0.0",
+  "description": "基于视觉的电脑操作 Agent，使用 AI 模型分析屏幕并执行操作 (TypeScript 版本)",
+  "main": "dist/electron/main.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "gui": "chcp 65001>nul && npm run build && set ELECTRON_RUN_AS_NODE=&& electron .",
+    "dev:gui": "npm run gui",
+    "lint": "eslint src/**/*.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "automation",
+    "ai",
+    "computer-control",
+    "vision",
+    "agent"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@fluentui/web-components": "^2.6.1",
+    "@nut-tree-fork/nut-js": "^4.2.6",
+    "axios": "^1.6.7",
+    "clipboardy": "^4.0.0",
+    "openai": "^4.28.4",
+    "screenshot-desktop": "^1.15.0",
+    "sharp": "^0.33.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.20",
+    "@types/screenshot-desktop": "^1.12.3",
+    "@typescript-eslint/eslint-plugin": "^7.0.2",
+    "@typescript-eslint/parser": "^7.0.2",
+    "electron": "^40.6.0",
+    "eslint": "^8.57.0",
+    "tsx": "^4.7.1",
+    "typescript": "^5.3.3"
+  }
+}

@@ -1,0 +1,534 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>系统设置</title>
+    <style>
+      :root {
+        --bg: #f5f7fb;
+        --card: #ffffff;
+        --line: #dbe2ea;
+        --text: #111827;
+        --muted: #64748b;
+        --accent: #111111;
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; width: 100%; height: 100%; }
+      body {
+        padding: 14px;
+        font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+        color: var(--text);
+        background: var(--bg);
+      }
+      .card {
+        height: 100%;
+        overflow: auto;
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 14px;
+      }
+      h1 { margin: 0; font-size: 18px; }
+      .hint { margin-top: 6px; color: var(--muted); font-size: 12px; }
+      .group { margin-top: 14px; padding-top: 12px; border-top: 1px solid #edf1f5; }
+      .group-title { font-size: 14px; font-weight: 700; margin-bottom: 8px; }
+      .field { margin-top: 10px; }
+      label { display: block; margin-bottom: 6px; color: var(--muted); font-size: 12px; }
+      input, textarea, select {
+        width: 100%;
+        border: 1px solid #ced7e0;
+        border-radius: 9px;
+        background: #fff;
+        color: var(--text);
+        padding: 9px 10px;
+        outline: none;
+        font-size: 13px;
+      }
+      input, select { height: 38px; }
+      textarea {
+        min-height: 86px;
+        resize: vertical;
+        font-family: 'Consolas', 'Cascadia Code', monospace;
+        line-height: 1.35;
+      }
+      input:focus, textarea:focus, select:focus { border-color: #94a3b8; }
+      .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+      .actions { margin-top: 14px; display: flex; gap: 10px; align-items: center; }
+      button {
+        border: 0;
+        border-radius: 9px;
+        height: 36px;
+        padding: 0 14px;
+        color: #fff;
+        background: var(--accent);
+        cursor: pointer;
+        font-size: 13px;
+      }
+      .subtle { background: #475569; }
+      .danger { background: #b42318; }
+      .ghost { background: #64748b; }
+      #status { margin-top: 10px; min-height: 20px; color: var(--muted); font-size: 12px; }
+      .warn { color: #9a6700; }
+      .error { color: #b42318; }
+      .ok { color: #067647; }
+      .example { margin-top: 10px; color: var(--muted); font-size: 12px; }
+      code { color: #334155; }
+      .hotkey-capture { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+      .provider-card {
+        margin-top: 10px;
+        border: 1px solid #d9e2ec;
+        border-radius: 10px;
+        padding: 10px;
+        background: #fbfdff;
+      }
+      .provider-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+      .provider-switch, .model-switch { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+      .models { margin-top: 8px; border-top: 1px dashed #d9e2ec; padding-top: 8px; }
+      .model-row {
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        gap: 8px;
+        align-items: center;
+        margin-top: 6px;
+      }
+      .small-btn { height: 30px; padding: 0 10px; font-size: 12px; border-radius: 7px; }
+      .provider-foot { display: flex; gap: 8px; margin-top: 8px; }
+    </style>
+  </head>
+  <body>
+    <main class="card">
+      <h1>系统设置</h1>
+      <div class="hint">支持多提供商、多模型池；可按模型选择单独调用或全模型轮询。</div>
+
+      <section class="group">
+        <div class="group-title">快捷键</div>
+        <div class="row">
+          <div class="field">
+            <label for="invokeHotkey">唤起输入框快捷键</label>
+            <div class="hotkey-capture">
+              <input id="invokeHotkey" type="text" readonly />
+              <button class="subtle" id="captureInvokeBtn">录制</button>
+            </div>
+          </div>
+          <div class="field">
+            <label for="interruptHotkey">中断任务快捷键</label>
+            <div class="hotkey-capture">
+              <input id="interruptHotkey" type="text" readonly />
+              <button class="subtle" id="captureInterruptBtn">录制</button>
+            </div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label for="autoCloseSeconds">完成弹窗自动关闭秒数</label>
+            <input id="autoCloseSeconds" type="number" min="1" max="60" />
+          </div>
+        </div>
+      </section>
+
+      <section class="group">
+        <div class="group-title">提供商与模型池</div>
+        <div id="providers"></div>
+        <div class="actions">
+          <button id="addProviderBtn" class="ghost">新增提供商</button>
+        </div>
+      </section>
+
+      <section class="group">
+        <div class="group-title">对话上下文</div>
+        <div class="row">
+          <div class="field">
+            <label for="contextLength">历史动作上下文长度（轮）</label>
+            <input id="contextLength" type="number" min="0" max="50" />
+          </div>
+        </div>
+      </section>
+
+      <div class="actions">
+        <button id="saveBtn">保存设置</button>
+      </div>
+
+      <div id="status"></div>
+      <div class="example">快捷键录制时直接按键组合即可；上下文长度建议 <code>8~20</code>。</div>
+    </main>
+
+    <script>
+      const invokeInput = document.getElementById('invokeHotkey');
+      const interruptInput = document.getElementById('interruptHotkey');
+      const secondsInput = document.getElementById('autoCloseSeconds');
+      const contextLengthInput = document.getElementById('contextLength');
+      const saveBtn = document.getElementById('saveBtn');
+      const providersRoot = document.getElementById('providers');
+      const addProviderBtn = document.getElementById('addProviderBtn');
+      const captureInvokeBtn = document.getElementById('captureInvokeBtn');
+      const captureInterruptBtn = document.getElementById('captureInterruptBtn');
+      const statusEl = document.getElementById('status');
+      const bridge = window.autogui;
+
+      let runtimeConfig = null;
+      let providers = [];
+      let activeCaptureInput = null;
+      let captureKeysDown = new Set();
+      let captureLastAccel = '';
+      let captureHasPrimaryKey = false;
+
+      function setStatus(text, type = '') {
+        statusEl.textContent = text;
+        statusEl.className = type;
+      }
+
+      function normalizeProviders(list) {
+        const source = Array.isArray(list) ? list : [];
+        return source.map((p, idx) => ({
+          id: String(p.id || `provider_${idx + 1}`),
+          name: String(p.name || p.id || `Provider ${idx + 1}`),
+          enabled: p.enabled !== false,
+          base_url: String(p.base_url || ''),
+          api_keys: Array.isArray(p.api_keys) ? p.api_keys.map((k) => String(k || '').trim()).filter(Boolean) : [],
+          models: Array.isArray(p.models)
+            ? p.models.map((m, mIdx) => ({ id: String(m.id || `model_${mIdx + 1}`), enabled: m.enabled !== false }))
+            : [],
+        }));
+      }
+
+      function parseKeys(text) {
+        return String(text || '')
+          .split(/\r?\n/)
+          .map((line) => line.trim())
+          .filter(Boolean);
+      }
+
+      function renderProviders() {
+        providersRoot.innerHTML = '';
+        providers.forEach((provider, pIndex) => {
+          const wrap = document.createElement('section');
+          wrap.className = 'provider-card';
+          wrap.innerHTML = `
+            <div class="provider-head">
+              <div class="provider-switch">
+                <input type="checkbox" ${provider.enabled ? 'checked' : ''} data-act="toggle-provider" data-pi="${pIndex}" />
+                <span>启用提供商</span>
+              </div>
+              <button class="small-btn danger" data-act="remove-provider" data-pi="${pIndex}">删除提供商</button>
+            </div>
+            <div class="row">
+              <div class="field">
+                <label>提供商 ID</label>
+                <input type="text" value="${provider.id}" data-act="provider-id" data-pi="${pIndex}" />
+              </div>
+              <div class="field">
+                <label>显示名称</label>
+                <input type="text" value="${provider.name}" data-act="provider-name" data-pi="${pIndex}" />
+              </div>
+            </div>
+            <div class="field">
+              <label>Base URL</label>
+              <input type="text" value="${provider.base_url}" data-act="provider-base" data-pi="${pIndex}" />
+            </div>
+            <div class="field">
+              <label>API Key（每行一个）</label>
+              <textarea data-act="provider-keys" data-pi="${pIndex}">${provider.api_keys.join('\n')}</textarea>
+            </div>
+            <div class="models" data-model-root="${pIndex}"></div>
+            <div class="provider-foot">
+              <button class="small-btn ghost" data-act="add-model" data-pi="${pIndex}">新增模型</button>
+            </div>
+          `;
+
+          const modelRoot = wrap.querySelector('[data-model-root]');
+          provider.models.forEach((model, mIndex) => {
+            const row = document.createElement('div');
+            row.className = 'model-row';
+            row.innerHTML = `
+              <label class="model-switch">
+                <input type="checkbox" ${model.enabled ? 'checked' : ''} data-act="toggle-model" data-pi="${pIndex}" data-mi="${mIndex}" />
+                <span>启用</span>
+              </label>
+              <input type="text" value="${model.id}" data-act="model-id" data-pi="${pIndex}" data-mi="${mIndex}" />
+              <button class="small-btn danger" data-act="remove-model" data-pi="${pIndex}" data-mi="${mIndex}">删除</button>
+            `;
+            modelRoot.appendChild(row);
+          });
+
+          providersRoot.appendChild(wrap);
+        });
+      }
+
+      function bindProviderActions() {
+        providersRoot.addEventListener('input', (event) => {
+          const t = event.target;
+          const act = t.dataset.act;
+          const pi = Number(t.dataset.pi);
+          const mi = Number(t.dataset.mi);
+          if (!Number.isFinite(pi) || !providers[pi]) return;
+
+          if (act === 'provider-id') providers[pi].id = t.value.trim();
+          if (act === 'provider-name') providers[pi].name = t.value.trim();
+          if (act === 'provider-base') providers[pi].base_url = t.value.trim();
+          if (act === 'provider-keys') providers[pi].api_keys = parseKeys(t.value);
+          if (act === 'model-id' && Number.isFinite(mi) && providers[pi].models[mi]) {
+            providers[pi].models[mi].id = t.value.trim();
+          }
+        });
+
+        providersRoot.addEventListener('change', (event) => {
+          const t = event.target;
+          const act = t.dataset.act;
+          const pi = Number(t.dataset.pi);
+          const mi = Number(t.dataset.mi);
+          if (!Number.isFinite(pi) || !providers[pi]) return;
+
+          if (act === 'toggle-provider') providers[pi].enabled = Boolean(t.checked);
+          if (act === 'toggle-model' && Number.isFinite(mi) && providers[pi].models[mi]) {
+            providers[pi].models[mi].enabled = Boolean(t.checked);
+          }
+        });
+
+        providersRoot.addEventListener('click', (event) => {
+          const t = event.target;
+          const act = t.dataset.act;
+          const pi = Number(t.dataset.pi);
+          const mi = Number(t.dataset.mi);
+
+          if (act === 'remove-provider' && Number.isFinite(pi)) {
+            providers.splice(pi, 1);
+            renderProviders();
+            return;
+          }
+
+          if (act === 'add-model' && Number.isFinite(pi) && providers[pi]) {
+            providers[pi].models.push({ id: 'new-model-id', enabled: true });
+            renderProviders();
+            return;
+          }
+
+          if (act === 'remove-model' && Number.isFinite(pi) && Number.isFinite(mi) && providers[pi]) {
+            providers[pi].models.splice(mi, 1);
+            renderProviders();
+          }
+        });
+      }
+
+      function acceleratorFromEvent(event) {
+        const parts = [];
+        if (event.ctrlKey) parts.push('CommandOrControl');
+        if (event.metaKey) parts.push('Command');
+        if (event.altKey) parts.push('Alt');
+        if (event.shiftKey) parts.push('Shift');
+
+        const key = event.key;
+        if (!key) return parts.join('+');
+
+        const skipKeys = ['Control', 'Shift', 'Alt', 'Meta'];
+        if (!skipKeys.includes(key)) {
+          let finalKey = key;
+          if (key === ' ') finalKey = 'Space';
+          if (key === 'Escape') finalKey = 'Escape';
+          if (key.length === 1) finalKey = key.toUpperCase();
+          parts.push(finalKey);
+        }
+
+        return parts.join('+');
+      }
+
+      function beginCapture(targetInput) {
+        activeCaptureInput = targetInput;
+        captureKeysDown = new Set();
+        captureLastAccel = '';
+        captureHasPrimaryKey = false;
+        targetInput.value = '按住组合键后松开...';
+        targetInput.focus();
+      }
+
+      function finishCapture() {
+        if (!activeCaptureInput) return;
+        if (captureLastAccel) {
+          activeCaptureInput.value = captureLastAccel;
+        }
+        activeCaptureInput = null;
+        captureKeysDown = new Set();
+        captureLastAccel = '';
+        captureHasPrimaryKey = false;
+      }
+
+      function isModifierKey(key) {
+        return ['Control', 'Shift', 'Alt', 'Meta'].includes(key);
+      }
+
+      window.addEventListener('keydown', (event) => {
+        if (!activeCaptureInput) return;
+        event.preventDefault();
+        event.stopPropagation();
+        captureKeysDown.add(event.code || event.key);
+        const accel = acceleratorFromEvent(event);
+        if (!isModifierKey(event.key)) {
+          captureHasPrimaryKey = true;
+        }
+        if (accel) {
+          captureLastAccel = accel;
+          activeCaptureInput.value = accel;
+        }
+      }, true);
+
+      window.addEventListener('keyup', (event) => {
+        if (!activeCaptureInput) return;
+        event.preventDefault();
+        event.stopPropagation();
+        captureKeysDown.delete(event.code || event.key);
+        if (captureHasPrimaryKey && captureKeysDown.size === 0) {
+          finishCapture();
+        }
+      }, true);
+
+      captureInvokeBtn.addEventListener('click', () => beginCapture(invokeInput));
+      captureInterruptBtn.addEventListener('click', () => beginCapture(interruptInput));
+
+      addProviderBtn.addEventListener('click', () => {
+        providers.push({
+          id: `provider_${providers.length + 1}`,
+          name: `Provider ${providers.length + 1}`,
+          enabled: true,
+          base_url: '',
+          api_keys: [],
+          models: [{ id: 'new-model-id', enabled: true }],
+        });
+        renderProviders();
+      });
+
+      function buildLegacyApiFromProviders(list) {
+        const enabledProvider = list.find((p) => p.enabled && p.base_url && p.models.some((m) => m.enabled));
+        if (!enabledProvider) {
+          return {
+            provider: 'OpenAI Compatible',
+            base_url: '',
+            model: '',
+            api_key: [],
+          };
+        }
+
+        const enabledModel = enabledProvider.models.find((m) => m.enabled && m.id);
+        return {
+          provider: enabledProvider.name || enabledProvider.id,
+          base_url: enabledProvider.base_url,
+          model: enabledModel ? enabledModel.id : '',
+          api_key: enabledProvider.api_keys,
+        };
+      }
+
+      async function loadSettings() {
+        const [hotkeyRes, configRes] = await Promise.all([
+          bridge.getHotkeySettings(),
+          bridge.getRuntimeConfig(),
+        ]);
+
+        if (!hotkeyRes.ok) {
+          setStatus('读取快捷键设置失败', 'error');
+          return;
+        }
+
+        invokeInput.value = hotkeyRes.settings.invokeHotkey;
+        interruptInput.value = hotkeyRes.settings.interruptHotkey;
+        secondsInput.value = String(Math.round(hotkeyRes.settings.completionAutoCloseMs / 1000));
+
+        if (!configRes.ok || !configRes.config) {
+          setStatus(configRes.message || '读取运行配置失败', 'error');
+          return;
+        }
+
+        runtimeConfig = configRes.config;
+        providers = normalizeProviders(runtimeConfig.api.providers || []);
+        if (providers.length === 0) {
+          providers = normalizeProviders([
+            {
+              id: 'default',
+              name: runtimeConfig.api.provider || 'OpenAI Compatible',
+              enabled: true,
+              base_url: runtimeConfig.api.base_url,
+              api_keys: Array.isArray(runtimeConfig.api.api_key)
+                ? runtimeConfig.api.api_key
+                : String(runtimeConfig.api.api_key || '').trim()
+                  ? [String(runtimeConfig.api.api_key)]
+                  : [],
+              models: [{ id: runtimeConfig.api.model || '', enabled: true }],
+            },
+          ]);
+        }
+
+        contextLengthInput.value = String(runtimeConfig.settings.action_context_length ?? 8);
+        renderProviders();
+      }
+
+      async function saveAll() {
+        const seconds = Number(secondsInput.value || 7);
+
+        const hotkeyRes = await bridge.saveHotkeySettings({
+          invokeHotkey: invokeInput.value.trim(),
+          interruptHotkey: interruptInput.value.trim(),
+          completionAutoCloseMs: Math.max(1, seconds) * 1000,
+        });
+
+        invokeInput.value = hotkeyRes.settings.invokeHotkey;
+        interruptInput.value = hotkeyRes.settings.interruptHotkey;
+        secondsInput.value = String(Math.round(hotkeyRes.settings.completionAutoCloseMs / 1000));
+
+        const cleanedProviders = normalizeProviders(providers).map((p) => ({
+          ...p,
+          models: p.models.filter((m) => m.id),
+        }));
+
+        const legacyApi = buildLegacyApiFromProviders(cleanedProviders);
+
+        const nextConfig = {
+          api: {
+            provider: legacyApi.provider,
+            base_url: legacyApi.base_url,
+            model: legacyApi.model,
+            api_key: legacyApi.api_key,
+            providers: cleanedProviders,
+          },
+          settings: {
+            screenshot_interval: runtimeConfig?.settings?.screenshot_interval ?? 2000,
+            max_iterations: runtimeConfig?.settings?.max_iterations ?? 50,
+            coordinate_scale: runtimeConfig?.settings?.coordinate_scale ?? 1000,
+            action_context_length: Math.max(0, Math.min(50, Number(contextLengthInput.value || 8))),
+          },
+        };
+
+        const runtimeRes = await bridge.saveRuntimeConfig(nextConfig);
+        if (!runtimeRes.ok) {
+          setStatus(runtimeRes.message || '保存运行配置失败', 'error');
+          return;
+        }
+
+        runtimeConfig = runtimeRes.config;
+
+        if (hotkeyRes.errors && hotkeyRes.errors.length > 0) {
+          setStatus(`已保存，但快捷键有冲突：${hotkeyRes.errors.join('；')}`, 'warn');
+          return;
+        }
+
+        setStatus('已保存并生效', 'ok');
+      }
+
+      saveBtn.addEventListener('click', () => {
+        void saveAll().catch((error) => {
+          setStatus(error instanceof Error ? error.message : String(error), 'error');
+        });
+      });
+
+      bridge.onHotkeyUpdated(({ invokeHotkey, interruptHotkey, errors }) => {
+        invokeInput.value = invokeHotkey;
+        interruptInput.value = interruptHotkey;
+        if (errors && errors.length > 0) {
+          setStatus(`快捷键更新存在问题：${errors.join('；')}`, 'warn');
+        }
+      });
+
+      bindProviderActions();
+      void loadSettings().catch((error) => {
+        setStatus(error instanceof Error ? error.message : String(error), 'error');
+      });
+    </script>
+  </body>
+</html>
