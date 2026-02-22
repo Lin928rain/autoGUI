@@ -312,6 +312,9 @@ export class Agent {
         return `${type}:${Number(action.scroll_amount ?? 0)}`;
       case 'wait':
         return `${type}:${Number(action.duration ?? 1000)}`;
+      case 'shell':
+        // shell 动作需要包含具体的命令内容
+        return `${type}:${String(action.command ?? '')}`;
       case 'enter':
       case 'task_complete':
         return type;
